@@ -14,7 +14,7 @@ window.bakeProfile = async (quality) => {
   await system.init({ config: { quality, q: { anisotropy: 4 } } });
   for (const name of system.names()) system.getTextureSet(name);
   for (const [name, opts] of Object.values(WEAPON_MATERIALS)) system.getTextureSet(name, opts);
-  const low = quality === 'low';
+  const low = quality === 'low' || quality === 'performance';
   new SoldierMaterials(new Rng(1947), { size: low ? 256 : 512, camo: ['arid', 'woodland', 'urban'] });
   // FX budget changes at ultra; include 512 in both profiles for medium/high.
   for (const size of (low ? [512] : [512, 1024])) {

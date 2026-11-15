@@ -1,7 +1,7 @@
 /** Precomputed PCM assets. Synthesis is permitted only in the offline bake page. */
 export const AUDIO_BAKE = typeof location !== 'undefined' && new URLSearchParams(location.search).get('bake') === '1';
 const buffers = new Map();
-let pending;
+let catalog, essential, extra;
 export function audioAsset(key, actx) {
   const buffer = buffers.get(key);
   if (!buffer || !actx || buffer.sampleRate === actx.sampleRate) return buffer;
@@ -21,24 +21,33 @@ export function audioAsset(key, actx) {
   buffers.set(cacheKey, out);
   return out;
 }
-export function preloadAudioAssets() {
-  if (AUDIO_BAKE) return Promise.resolve();
-  if (!pending) pending = (async () => {
+async function loadAudioGroup(core) {
     const base = import.meta.env.BASE_URL + 'baked/audio/';
-    const response = await fetch(base + 'manifest.json');
-    if (!response.ok) throw new Error('Missing baked audio manifest');
-    const manifest = await response.json();
+    catalog ??= fetch(base + 'manifest.json').then(response => {
+      if (!response.ok) throw new Error('Missing baked audio manifest');
+      return response.json();
+    }).catch(error => { catalog = undefined; throw error; });
+    const manifest = await catalog;
     const decoder = new OfflineAudioContext(2, 1, manifest.sampleRate);
-    const entries = Object.entries(manifest.files);
+    // Loops, room impulses and the first recorded variant of every effect.
+    // The other variants can stream after the game and audio graph are ready.
+    const primary = key => /^(noise|ir):/.test(key) || key.endsWith(':0');
+    const entries = Object.entries(manifest.files).filter(([key]) => primary(key) === core && !buffers.has(key));
     let next = 0;
     await Promise.all(Array.from({ length: 4 }, async () => {
       while (next < entries.length) {
         const [key, file] = entries[next++];
-        const r = await fetch(base + file);
+        const r = await fetch(base + file, { priority: 'low' });
         if (!r.ok) throw new Error('Missing baked audio: ' + file);
         buffers.set(key, await decoder.decodeAudioData(await r.arrayBuffer()));
       }
     }));
-  })().catch(error => { pending = undefined; throw error; });
-  return pending;
+}
+
+export function preloadAudioAssets(coreOnly = true) {
+  if (AUDIO_BAKE) return Promise.resolve();
+  essential ??= loadAudioGroup(true).catch(error => { essential = undefined; throw error; });
+  if (coreOnly) return essential;
+  extra ??= essential.then(() => loadAudioGroup(false)).catch(error => { extra = undefined; throw error; });
+  return extra;
 }

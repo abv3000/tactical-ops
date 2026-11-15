@@ -12,6 +12,7 @@
     "bake:models": "node tools/bake-models.mjs",
     "verify:models": "node tools/verify-models.mjs",
     "bake:textures": "node tools/bake-textures.mjs",
+    "bake:loadouts": "node tools/bake-loadouts.mjs",
     "bake:audio": "node tools/bake-audio.mjs",
     "start": "node tools/local-play.mjs",
     "bake:environment": "node tools/bake-environment.mjs",

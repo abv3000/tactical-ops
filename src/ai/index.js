@@ -151,7 +151,8 @@ export class AiSystem {
     // which is what decides how every soldier is stitched together — is
     // unchanged. `update()` keeps the same code as a fallback for the case where
     // the collision world is not registered yet.
-    this._navigation = await loadBakedNavigation(ctx.config.map);
+    this._navigation = ctx.bakedNavigation ?? await loadBakedNavigation(ctx.config.map);
+    delete ctx.bakedNavigation;
     this._bootNav(ctx);
     await this.prewarmMaterials();
   }

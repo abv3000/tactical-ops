@@ -168,6 +168,7 @@ export class AudioSystem {
       const resumed = actx.state === 'suspended' ? actx.resume() : Promise.resolve();
       await preloadAudioAssets();
       await resumed;
+      if (this.actx !== actx) return false; // match exited during async loading
       this.bank = new NoiseBank(actx, this.rng.fork(), 2.4);
       this.mixer = new Mixer(actx, this.rng.fork(), {});
       this.mixer.buildReverbs();
@@ -178,11 +179,13 @@ export class AudioSystem {
 
       this.voiceBank = new VoiceBank(this.rng.fork());
       this.voiceBank.registerDefaults(WEAPON_PROFILES.rifle);
-      for (const profile of Object.values(WEAPON_PROFILES)) this.voiceBank.request(profile, actx.sampleRate);
-      for (const k of [WEAPON_PROFILES.rifle, 'shell:hard', 'shell:soft', 'shell:mid',
-                       'impact:hard', 'impact:soft', 'impact:mid']) {
-        this.voiceBank.request(k, actx.sampleRate);
-      }
+      const refreshVoices = () => {
+        if (this.actx !== actx) return;
+        for (const key of [...Object.values(WEAPON_PROFILES), 'shell:hard', 'shell:soft', 'shell:mid',
+                           'impact:hard', 'impact:soft', 'impact:mid']) this.voiceBank.request(key, actx.sampleRate);
+      };
+      refreshVoices();
+      preloadAudioAssets(false).then(refreshVoices).catch(error => console.warn('[audio] extra variants unavailable:', error));
       // Every high-frequency voice now comes from the preloaded sample bank.
 
       if (actx.state === 'suspended') await actx.resume();
@@ -360,8 +363,8 @@ export class AudioSystem {
          * voice rebalances its layers by range, so a buffer rendered at zero
          * metres is only honest at zero metres. Enemy fire stays synthesised.
          *
-         * All variants are preloaded before the graph starts. No voice baking
-         * runs on the published game path.
+         * The first variant is ready before the graph starts. More recordings
+         * arrive in the background without synthesising new sample buffers.
          */
         if (o.firstPerson) {
           const baked = this.voiceBank?.play(actx, profile, rng, when,

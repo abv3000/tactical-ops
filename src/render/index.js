@@ -347,12 +347,16 @@ export class RenderSystem {
     // in there; remember how many children that is.
     this._viewRigChildren = ctx.viewScene.children.length;
 
-    const env = buildFallbackEnvironment(renderer, this._dirFromLight(this.sun, this.sunDir));
-    this.envTarget = env.target;
-    this.envEquirect = env.equirect;
-    this.envMap = this.envTarget.texture;
-    if (!ctx.scene.environment) ctx.scene.environment = this.envMap;
-    if (!ctx.scene.background) ctx.scene.background = this.envEquirect;
+    if (!ctx.has?.('sky')) {
+      // Standalone renderer previews still need an environment. The game
+      // already installs the sky's environment before any frame is drawn.
+      const env = buildFallbackEnvironment(renderer, this._dirFromLight(this.sun, this.sunDir));
+      this.envTarget = env.target;
+      this.envEquirect = env.equirect;
+      this.envMap = this.envTarget.texture;
+      if (!ctx.scene.environment) ctx.scene.environment = this.envMap;
+      if (!ctx.scene.background) ctx.scene.background = this.envEquirect;
+    }
     ctx.viewScene.environment = ctx.scene.environment;
     this._assignedViewEnv = ctx.scene.environment;
 

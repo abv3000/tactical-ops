@@ -11,7 +11,7 @@ export function unpackWorld(buffer) {
     if (!v || typeof v !== 'object') return v;
     if (v.$array) {
       const Ctor = globalThis[v.$array];
-      return new Ctor(buffer.slice(offset + v.offset, offset + v.offset + v.bytes));
+      return new Ctor(buffer, offset + v.offset, v.bytes / Ctor.BYTES_PER_ELEMENT);
     }
     for (const key of Object.keys(v)) v[key] = revive(v[key]);
     return v;
@@ -19,15 +19,21 @@ export function unpackWorld(buffer) {
   return revive(header);
 }
 
-export async function loadBakedWorld(world, ctx) {
-  const map = ctx.config.map;
+export async function preloadWorld(map) {
   if (!['street', 'swat', 'box'].includes(map)) throw new Error(`Unknown map: ${map}`);
-  const start = performance.now();
   const response = await fetch(`${import.meta.env.BASE_URL}baked/worlds/${map}.bin.gz`);
   if (!response.ok) throw new Error(`Map download failed: ${response.status}`);
   const buffer = response.headers.get('content-encoding')?.includes('gzip')
     ? await response.arrayBuffer()
     : await new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+  return buffer;
+}
+
+export async function loadBakedWorld(world, ctx) {
+  const map = ctx.config.map;
+  const start = performance.now();
+  const buffer = ctx.bakedWorld ?? await preloadWorld(map);
+  delete ctx.bakedWorld;
   const data = unpackWorld(buffer);
   const materials = ctx.get('materials');
   const physics = ctx.peek('physics');

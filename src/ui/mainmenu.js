@@ -80,6 +80,8 @@ const CSS = `
 .ow-fe .ow-foot{text-align:center;max-width:620px;line-height:1.8;color:#8c9aab}
 .ow-fe .ow-fullscreen{background:transparent;border:0;width:auto;min-height:36px;text-align:center;font-size:12px;color:#a5c7e9;margin:0}
 .ow-fe .ow-device{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:#8eb2d9}
+.ow-fe .ow-quality{display:flex;align-items:center;gap:8px;color:#a5c7e9;font-size:12px}
+.ow-quality select{padding:6px;background:#151b23;color:#fff;border:1px solid #3d4c60;border-radius:4px;font:inherit}
 .ow-menu-inner{max-height:90dvh!important;overflow-y:auto!important;max-width:calc(100vw - 24px)!important;overscroll-behavior:contain}
 @media(max-width:650px){.ow-fe{justify-content:flex-start;gap:20px}.ow-fe h1{margin-top:10px;font-size:32px}.ow-fe .ow-cols{width:100%;gap:14px}.ow-fe .ow-col{width:100%}.ow-fe button{padding:11px 14px}.ow-fe h2{margin-bottom:8px}.ow-fe .ow-play{width:100%;margin:0}.ow-fe .ow-foot{font-size:11px}.ow-fe .ow-device{font-size:9px}}
 @media(max-height:500px) and (min-width:651px){.ow-fe{gap:10px;padding:16px;justify-content:flex-start}.ow-fe h1{font-size:24px}.ow-fe h1 span{display:none}.ow-fe .ow-cols{gap:20px}.ow-fe h2{margin-bottom:6px}.ow-fe button{padding:7px 12px;margin-bottom:5px;min-height:44px}.ow-fe .ow-play{padding:9px 40px}.ow-fe .ow-foot{font-size:10px}.ow-fe .ow-fullscreen{position:absolute;right:20px;top:12px}}
@@ -94,8 +96,7 @@ function el(html) {
 
 /**
  * Paint the menu and resolve with the player's choice once they hit Play.
- * @param {{map?:string, mode?:string}} initial  pre-selection from the URL
- * @returns {Promise<{map:string, mode:string}>}
+ * @param {{map?:string, mode?:string, quality?:string, fixedQuality?:boolean}} initial
  */
 export function showMainMenu(initial = {}) {
   // The menu is re-shown after every Exit, and a <style> per visit would pile
@@ -129,12 +130,15 @@ export function showMainMenu(initial = {}) {
         <div class="ow-col" id="ow-maps"><h2>Карта</h2>${list(MAPS, map)}</div>
         <div class="ow-col" id="ow-modes"><h2>Режим игры</h2>${list(MODES, mode)}</div>
       </div>
+      ${touch || initial.fixedQuality ? '' : '<label class="ow-quality">Графика <select aria-label="Графика"><option value="performance">Быстрый запуск</option><option value="low">Детальная</option></select></label>'}
       <button type="button" class="ow-play">Начать операцию</button>
       <div class="ow-foot">${touch ? 'Джойстик слева — движение · Свайп справа — обзор<br>Для удобства поверните телефон горизонтально.' : 'WASD — движение · Мышь — прицел · Shift — бег · R — перезарядка · Esc — пауза'}</div>
       <button type="button" class="ow-fullscreen">На весь экран ↗</button>
     </div>
   `);
   document.body.appendChild(root);
+  const quality = root.querySelector('.ow-quality select');
+  if (quality) quality.value = initial.quality === 'low' ? 'low' : 'performance';
   const full = root.querySelector(".ow-fullscreen");
   if (!document.documentElement.requestFullscreen) full.hidden = true;
   full.addEventListener("click", () => document.documentElement.requestFullscreen?.().catch(() => {}));
@@ -156,7 +160,7 @@ export function showMainMenu(initial = {}) {
     const go = () => {
       removeEventListener("keydown", onKey);
       root.remove();
-      resolve({ map, mode });
+      resolve({ map, mode, quality: quality?.value });
     };
     root.querySelector('.ow-play').addEventListener('click', go);
     const onKey = (e) => { if (e.key === 'Enter' && root.isConnected && e.target.tagName !== 'BUTTON') go(); };

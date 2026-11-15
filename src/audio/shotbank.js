@@ -81,16 +81,17 @@ export class VoiceBank {
 
   /** Idempotent; returns immediately. Nothing ever waits on a bake. */
   request(key, sampleRate) {
-    if (this.banks.has(key) || this.pending.has(key)) return this.pending.get(key);
     if (!AUDIO_BAKE) {
       const name = typeof key === 'string' ? key : 'shot:' + (Object.keys(WEAPON_PROFILES).find(k => WEAPON_PROFILES[k] === key) ?? 'rifle');
-      const bufs = Array.from({ length: VARIANTS }, (_, i) => audioAsset(name + ':' + i));
-      if (bufs.every(Boolean)) {
+      const bufs = Array.from({ length: VARIANTS }, (_, i) => audioAsset(name + ':' + i)).filter(Boolean);
+      const previous = this.banks.get(key)?.length ?? 0;
+      if (bufs.length > previous) {
         this.banks.set(key, bufs);
-        this.stats.baked += bufs.length;
+        this.stats.baked += bufs.length - previous;
       }
       return Promise.resolve();
     }
+    if (this.banks.has(key) || this.pending.has(key)) return this.pending.get(key);
     const recipe = this.recipes.get(key);
     if (!recipe) return undefined;
     const job = this._bake(recipe, sampleRate)

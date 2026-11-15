@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { textureRecipe, textureSize } from './asset-keys.js';
 import { BAKING, bakedAsset, registerBakedAsset } from '../assets/baked-textures.js';
 import { TextureForge } from './generator.js';
 import { LIBRARY, resolveName } from './library.js';
@@ -43,7 +44,6 @@ export class MaterialSystem {
     this._groundY = 0;
     this._built = false;
     this._warned = false;
-    this._quality = 1;
     /** seconds since the last bake, for the scratch-target release below */
     this._idle = 0;
     this._scratchFreed = false;
@@ -54,8 +54,7 @@ export class MaterialSystem {
     const q = ctx?.config?.q;
     this._anisotropy = q?.anisotropy ?? 8;
     // Texture budget scales with the quality preset; 1K is the reference.
-    this._quality =
-      ['low', 'performance'].includes(ctx?.config?.quality) ? 0.5 : ctx?.config?.quality === 'medium' ? 0.75 : 1;
+    this._quality = ctx?.config?.quality;
     /**
      * Drop the per-pixel marches on the web profile.
      *
@@ -134,9 +133,7 @@ export class MaterialSystem {
   }
 
   _size(base) {
-    const s = Math.max(128, Math.round((base * this._quality) / 128) * 128);
-    // keep it a power of two so mip chains stay clean
-    return 1 << Math.round(Math.log2(s));
+    return textureSize(base, this._quality);
   }
 
   /**
@@ -155,21 +152,12 @@ export class MaterialSystem {
     return 'concrete';
   }
 
-  _bakeKey(name, bake) {
-    return `${name}|${bake.size}|${bake.seed}|${bake.tintA ?? ''}|${bake.tintB ?? ''}|${(
-      bake.param ?? []
-    ).join('_')}|${bake.relief}|${bake.worldSize}`;
-  }
-
   /** Build (or fetch) the three packed textures for a surface. */
   getTextureSet(name, opts = {}) {
     const key = this._resolve(name);
-    const def = LIBRARY[key];
     if (!this._tryBuild()) return null;
 
-    const bake = { ...def.bake, ...(opts.bake ?? {}) };
-    bake.size = this._size(bake.size);
-    const cacheKey = this._bakeKey(key, bake);
+    const { def, bake, cacheKey } = textureRecipe(key, opts, this._quality);
     let set = this._sets.get(cacheKey);
     if (set) return set;
 

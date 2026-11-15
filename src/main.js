@@ -17,11 +17,12 @@ import { installShotApi } from './dev/shots.js';
 import { prewarm } from './core/prewarm.js';
 import { showMainMenu, showLoading, MAPS } from './ui/mainmenu.js';
 import { portal } from './core/portal.js';
-import { preloadBakedTextures } from './assets/baked-textures.js';
+import { BAKING, preloadBakedTextures } from './assets/baked-textures.js';
 import { preloadModels } from './assets/models.js';
+import { preloadWorld } from './assets/worlds.js';
+import { loadBakedNavigation } from './assets/navigation.js';
 import { preloadAudioAssets } from './audio/assets.js';
-import { isTouchDevice } from './core/touch.js';
-import { MobileRenderSystem, MobileSkySystem } from './render/mobile.js';
+import { MobileRenderSystem, MobileSkySystem, preloadReflections } from './render/mobile.js';
 
 const params = new URLSearchParams(location.search);
 const capture = params.get('capture') === '1';
@@ -91,7 +92,7 @@ async function runMatch(choice) {
   const config = createConfig({
     // Keep the launch path friendly to browser portals. Use ?q=ultra when
     // comparing the full desktop-quality renderer.
-    quality: params.get('q') ?? (isTouchDevice() ? 'performance' : 'low'),
+    quality: params.get('q') ?? choice.quality ?? (capture ? 'low' : 'performance'),
     map: choice.map,
     mode: choice.mode,
     // ?skin= applies a weapon finish at boot — the only way to review one under
@@ -144,7 +145,15 @@ async function runMatch(choice) {
 
   try {
     const assetStart = performance.now();
-    await Promise.all([preloadBakedTextures(config.quality), preloadModels(), preloadAudioAssets()]);
+    const [, , world, navigation] = await Promise.all([
+      preloadBakedTextures(config.quality, undefined, capture || params.has('rview') ? undefined : config.map),
+      preloadModels(),
+      BAKING ? undefined : preloadWorld(config.map),
+      loadBakedNavigation(config.map),
+      config.quality === 'performance' ? preloadReflections() : undefined,
+    ]);
+    engine.ctx.bakedWorld = world;
+    engine.ctx.bakedNavigation = navigation;
     window.__ASSET_LOAD_MS__ = performance.now() - assetStart;
     console.info(`[boot] assets loaded ${window.__ASSET_LOAD_MS__.toFixed(0)}ms`);
     await engine.init();
@@ -272,6 +281,11 @@ BOOT FAILURE\n\n${err.stack ?? err.message}</pre>`
     const readyProbe = () => {
       if (++warm >= BOOT_FRAMES) {
         window.__READY__ = true;
+        // Audio never holds the first playable frame. The first gesture can
+        // start the same download even sooner if the player presses a control.
+        if (!capture) requestAnimationFrame(() => {
+          preloadAudioAssets().catch(error => console.warn('[audio] preload unavailable:', error));
+        });
         return;
       }
       requestAnimationFrame(readyProbe);
@@ -319,8 +333,9 @@ BOOT FAILURE\n\n${err.stack ?? err.message}</pre>`
 if (skipMenu) {
   await runMatch({ map: params.get('map') ?? 'street', mode: params.get('mode') ?? 'tdm' });
 } else {
+  let choice = { map: params.get('map'), mode: params.get('mode') };
   for (;;) {
-    const choice = await showMainMenu({ map: params.get('map'), mode: params.get('mode') });
+    choice = await showMainMenu({ ...choice, fixedQuality: params.has('q') });
     await runMatch(choice);
   }
 }

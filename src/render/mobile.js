@@ -1,5 +1,24 @@
 import * as THREE from 'three';
 
+let reflectionData;
+export function preloadReflections() {
+  reflectionData ??= (async () => {
+    const response = await fetch(`${import.meta.env.BASE_URL}baked/reflections.bin.gz`);
+    if (!response.ok) throw new Error(`Reflection atlas unavailable: ${response.status}`);
+    const uncompressed = response.headers.get('content-encoding')?.includes('gzip')
+      ? response : new Response(response.body.pipeThrough(new DecompressionStream('gzip')));
+    const bytes = await uncompressed.arrayBuffer();
+    const header = new DataView(bytes);
+    const width = header.getUint32(0, true), height = header.getUint32(4, true);
+    if (!width || !height || bytes.byteLength !== 8 + width * height * 8) throw new Error('Invalid reflection atlas');
+    return { width, height, pixels: new Uint16Array(bytes, 8) };
+  })().catch(error => {
+    reflectionData = undefined;
+    throw error;
+  });
+  return reflectionData;
+}
+
 // Mobile uses a direct forward pass. The desktop deferred/post stack compiles
 // dozens of GPU programs even with its effects switched off.
 export class MobileRenderSystem {
@@ -30,9 +49,12 @@ export class MobileRenderSystem {
     this.viewSun.position.set(-1,2,3);
     this.viewFill = new THREE.HemisphereLight(0xc2dbff,0x9b8063,6);
     ctx.viewScene.add(this.viewSun,this.viewSun.target,this.viewFill);
-    const environment = await new THREE.TextureLoader().loadAsync(`${import.meta.env.BASE_URL}baked/environment.png`);
-    environment.mapping = THREE.EquirectangularReflectionMapping;
-    environment.colorSpace = THREE.SRGBColorSpace;
+    const { width, height, pixels } = await preloadReflections();
+    const environment = new THREE.DataTexture(pixels, width, height, THREE.RGBAFormat, THREE.HalfFloatType);
+    environment.mapping = THREE.CubeUVReflectionMapping;
+    environment.minFilter = environment.magFilter = THREE.LinearFilter;
+    environment.colorSpace = THREE.LinearSRGBColorSpace;
+    environment.needsUpdate = true;
     ctx.scene.environment = ctx.viewScene.environment = environment;
     this.environment = environment;
   }
