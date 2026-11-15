@@ -906,6 +906,38 @@
       "sha256": "3f2d4135b21de46c560778752b98108c5e52fa79a9184831d7d3668f2bd4306d"
     },
     {
+      "path": "public/baked/armory/catalog.json",
+      "sha256": "63766eca11e6f02cee3318efb0d4f9a8c3f77f279db552f80166dac79fe76223"
+    },
+    {
+      "path": "public/baked/armory/mcx.glb.gz",
+      "sha256": "bc4b2772aabc7331efb4be3285aa4f2cd1d23a2b46423a59857a7df204cd8cd4"
+    },
+    {
+      "path": "public/baked/armory/pistol.glb.gz",
+      "sha256": "b30e128194b7d16a719c9a715d37e76c7d68ff79c1f181cd8d52631bdc507fe5"
+    },
+    {
+      "path": "public/baked/armory/rifle.glb.gz",
+      "sha256": "3595b0a35ace2e50ca9c4d5b20b8b631d92ade8bfa41f0c70c33d2366cc54edf"
+    },
+    {
+      "path": "public/baked/armory/sights.glb.gz",
+      "sha256": "f05fdfaa47e0a2a96b5937ab8f56427eaf080d4be76b0df7ec1692a467bc43b6"
+    },
+    {
+      "path": "public/baked/armory/smg.glb.gz",
+      "sha256": "b821261f2a3fbbe74d7b8ec7afe739a1cbf3db7d8cc5d5aabbea1edc3c10047f"
+    },
+    {
+      "path": "public/baked/armory/suppressors.glb.gz",
+      "sha256": "d8e9f63088846efef3cbf1b1dde4c4613da507bcfd82b2232f67717fe7c116bb"
+    },
+    {
+      "path": "public/baked/armory/toz.glb.gz",
+      "sha256": "d9be1977bfee889e6c46b6225b18dd792a4fc12f6d1bc4d41fda5f2c12552374"
+    },
+    {
       "path": "public/baked/audio/impact-hard-0.wav",
       "sha256": "2c89175195bf129a2517301984bdd09b470eb691fb0020edc6b3ca6d4a16bb55"
     },

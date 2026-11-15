@@ -284,6 +284,22 @@ export const WEAPON_DEFS = {
   },
 };
 
+// Gameplay tuning for the imported models (not a firearms specification).
+WEAPON_DEFS.mcx = {
+  ...WEAPON_DEFS.rifle, id: 'mcx', label: 'SIG Sauer MCX Legacy', rpm: 735,
+  modes: ['auto', 'semi'], audio: 'rifle', adsTime: .215,
+  recoil: { ...WEAPON_DEFS.rifle.recoil, patternSeed: 0x86af31 },
+};
+WEAPON_DEFS.toz = {
+  ...WEAPON_DEFS.rifle, id: 'toz', label: 'ТОЗ-34', class: 'shotgun', audio: 'shotgun',
+  caliber: '12/76', rpm: 210, modes: ['semi'], magSize: 2, reserve: 24,
+  breakAction: true, pellets: 8, muzzleVelocity: 385, damage: 13,
+  penetration: .25, dropoff: .42, maxRange: 95, spreadHip: 5.2, spreadAds: 3.6,
+  spreadPerShot: .5, spreadMax: 8, reloadTac: 2.2, reloadEmpty: 2.35, magLen: .12,
+  hipPos: [.13, -.175, -.28],
+  recoil: { ...WEAPON_DEFS.rifle.recoil, pitch: .069, kickBack: .062, patternLength: 2 },
+};
+
 /**
  * Generate the deterministic recoil pattern for a weapon.
  *

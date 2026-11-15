@@ -1,4 +1,6 @@
 import { el, setText, setStyle, clamp, damp, ease } from './util.js';
+import { createArmory, ARMORY_CSS } from './armory.js';
+import { readLoadout, saveLoadout } from '../weapons/loadout.js';
 import { OPTIC_ORDER } from '../weapons/optics.js';
 import { MUZZLE_ORDER } from '../weapons/muzzles.js';
 import { MAG_ORDER } from '../weapons/mags.js';
@@ -95,11 +97,24 @@ export class PauseMenu {
     this.settingsBtn = el('button', 'ow-btn ow-btn-wide', rootBtns, 'Settings');
     this.settingsBtn.type = 'button';
     this.settingsBtn.addEventListener('click', () => this.setPage('settings'));
+    const armoryBtn = el('button', 'ow-btn ow-btn-wide', rootBtns, 'Арсенал');
+    armoryBtn.type = 'button';
+    armoryBtn.hidden = !ctx.config.useArmory;
+    armoryBtn.addEventListener('click', () => this.setPage('armory'));
     this.exitBtn = el('button', 'ow-btn ow-btn-wide ow-btn-danger', rootBtns, 'Exit to menu');
     this.exitBtn.type = 'button';
     this.exitBtn.addEventListener('click', () => this.exit());
 
     this.settingsPage = el('div', 'ow-page', inner);
+    this.armoryPage = el('div', 'ow-page', inner);
+    el('style', null, this.armoryPage, ARMORY_CSS);
+    this.armory = createArmory(readLoadout(), value => {
+      this.ctx.peek('weapons')?.applyLoadout(saveLoadout(value));
+    });
+    this.armoryPage.append(this.armory.root);
+    const back = el('button', 'ow-btn ow-btn-wide', this.armoryPage, 'Назад');
+    back.type = 'button';
+    back.addEventListener('click', () => this.setPage('root'));
     this.rows = el('div', null, this.settingsPage);
 
     // ---- quality preset --------------------------------------------------
@@ -123,6 +138,7 @@ export class PauseMenu {
      * SMG and this row follows it.
      */
     this.opticRow = this._row('Optic');
+    if (ctx.config.useArmory) this.opticRow.hidden = true;
     this.opticSeg = el('div', 'ow-seg', this.opticRow);
     this.opticBtns = [];
     for (const id of OPTIC_ORDER) {
@@ -140,6 +156,7 @@ export class PauseMenu {
     // Same build-all/toggle scheme as the optic; the note shows how far the
     // fitted device carries, because that is the stat the choice is about.
     this.muzzleRow = this._row('Muzzle');
+    if (ctx.config.useArmory) this.muzzleRow.hidden = true;
     const mSeg = el('div', 'ow-seg', this.muzzleRow);
     this.muzzleBtns = [];
     for (const id of [...MUZZLE_ORDER, 'trilug']) {
@@ -308,11 +325,14 @@ export class PauseMenu {
   /** 'root' | 'settings'. The overlay itself is the same either way. */
   setPage(page = 'root') {
     const settings = page === 'settings';
-    this.page = settings ? 'settings' : 'root';
-    setStyle(this.rootPage, 'display', settings ? 'none' : '');
+    const armory = page === 'armory';
+    this.page = page;
+    setStyle(this.rootPage, 'display', settings || armory ? 'none' : '');
     setStyle(this.settingsPage, 'display', settings ? '' : 'none');
-    setText(this.title, settings ? 'SETTINGS' : 'PAUSED');
+    setStyle(this.armoryPage, 'display', armory ? '' : 'none');
+    setText(this.title, settings ? 'SETTINGS' : armory ? 'Арсенал' : 'PAUSED');
     if (settings) this.syncFromConfig();
+    if (armory) this.armory.set(this.ctx.peek('weapons')?.getLoadout() ?? readLoadout());
   }
 
   _row(name) {
@@ -461,7 +481,7 @@ export class PauseMenu {
       this.show();
       return;
     }
-    if (this.page === 'settings') {
+    if (this.page !== 'root') {
       this.setPage('root');
       return;
     }

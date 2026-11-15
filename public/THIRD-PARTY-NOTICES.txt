@@ -62,3 +62,21 @@ SOFTWARE.
 -------------------------------------------------------------------------------
 No other third-party code, art, audio or fonts are used: every texture, mesh,
 animation and sound in this game is generated procedurally at runtime.
+
+Weapon and accessory models
+---------------------------
+The following low-poly models are by D_U (https://sketchfab.com/DU1701)
+and are used under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/):
+
+- Colt M4A1: https://sketchfab.com/3d-models/low-poly-colt-m4a1-c0313e9f6c164de8903615c4297a2485
+- HK MP7 A1: https://sketchfab.com/3d-models/low-poly-hk-mp7-a1-4715a09c0d054bdba7c0fbf0929a9878
+- Colt M45A1: https://sketchfab.com/3d-models/low-poly-colt-m45a1-5644f224a4264e9b80bbb2c897c61eca
+- SIG Sauer MCX Legacy: https://sketchfab.com/3d-models/low-poly-sig-sauer-mcx-legacy-baa3ae9cc75b4f14aa0854854d59d917
+- TOZ-34: https://sketchfab.com/3d-models/low-poly-toz-34-f66beb11ffcb4e7492d3e06a19558594
+- Collimator Set: https://sketchfab.com/3d-models/low-poly-collimator-set-288373d26dd84db2898920222ac3e430
+- Muzzle Device Set: https://sketchfab.com/3d-models/low-poly-muzzle-device-set-07f62ec5ca604446848d1a0238b11f1d
+
+Changes: selected parts and accessories, adjusted scale and orientation,
+prepared moving parts and aiming points for the game, removed baked reticle
+emission, tuned lens transparency, and exported compressed glTF assets.
+The models do not imply endorsement by the author or weapon manufacturers.

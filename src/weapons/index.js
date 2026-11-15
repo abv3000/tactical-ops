@@ -7,6 +7,8 @@ import { WEAPON_DEFS, buildRecoilPattern, SPREAD_MODS } from './defs.js';
 import { buildRifle } from './models/rifle.js';
 import { buildSmg } from './models/smg.js';
 import { buildPistol } from './models/pistol.js';
+import { armoryModel } from '../assets/armory.js';
+import { ARMORY, normalizeLoadout } from './loadout.js';
 import { clamp, clamp01, lerp, damp, DEG } from './mathx.js';
 
 /**
@@ -179,16 +181,23 @@ export class WeaponSystem {
     const t0 = performance.now();
     const builders = { rifle: buildRifle, smg: buildSmg, pistol: buildPistol };
     let tris = 0;
-    for (const id of ['rifle', 'smg', 'pistol']) {
+    const ids = ctx.config.useArmory ? ARMORY.map(w => w.id) : Object.keys(builders);
+    for (const id of ids) {
       const def = { ...WEAPON_DEFS[id] };
+      if (ctx.config.useArmory) {
+        def.label = ARMORY.find(w => w.id === id).label;
+        if (id === 'pistol') Object.assign(def, { caliber: '.45 ACP', magSize: 8, reserve: 40, muzzleVelocity: 260, damage: 35 });
+        if (id === 'smg') Object.assign(def, { caliber: '4.6×30', magSize: 30, reserve: 210, muzzleVelocity: 650 });
+      }
       def.cycleTime = 60 / def.rpm;
-      const model = builders[id]();
+      const model = ctx.config.useArmory ? armoryModel(id) : builders[id]();
       const entry = this.viewmodel.addWeapon(model, def);
       tris += entry.tris;
       this.states.set(id, {
         def,
+        baseCapacity: def.magSize,
         pattern: buildRecoilPattern(def, Rng),
-        mag: def.magSize,
+        mag: def.breakAction ? def.magSize - 1 : def.magSize,
         chambered: true,
         reserve: def.reserve,
         mode: def.modes[0],
@@ -201,6 +210,7 @@ export class WeaponSystem {
      * `?muzzle=can` leaves the pistol alone rather than failing.
      */
     const vm = this.viewmodel;
+    if (ctx.config.useArmory) this.applyLoadout(ctx.config.loadout);
     for (const id of this.states.keys()) {
       if (ctx.config.skin) vm.setSkin(id, ctx.config.skin);
       if (ctx.config.optic) vm.setOptic(id, ctx.config.optic);
@@ -376,6 +386,30 @@ export class WeaponSystem {
     return this.setWeapon(ids[(i + 1) % ids.length]);
   }
 
+  getLoadout() {
+    return normalizeLoadout({ weapon: this.activeId, kits: Object.fromEntries(
+      [...this.viewmodel.weapons].map(([id, entry]) => [id, { optic: entry.opticId, muzzle: entry.muzzleId }])
+    ) });
+  }
+
+  applyLoadout(selection) {
+    if (!this.ctx.config.useArmory) return;
+    const loadout = normalizeLoadout(selection);
+    for (const [id, kit] of Object.entries(loadout.kits)) {
+      this.viewmodel.setOptic(id, kit.optic);
+      this.viewmodel.setMuzzle(id, kit.muzzle);
+    }
+    if (this.activeId !== loadout.weapon) {
+      this._burstLeft = 0;
+      this._shotIndex = 0;
+      this.viewmodel.stopClip();
+      for (const shell of this._shellQueue) shell.t = -1;
+      this.setWeaponImmediate(loadout.weapon);
+      this.viewmodel.play('draw');
+    }
+    this._opticZoom = this.opticMagRange?.[0] ?? 1;
+  }
+
   /* ---- magazines --------------------------------------------------------- */
 
   get magSpec() {
@@ -412,7 +446,7 @@ export class WeaponSystem {
     const magReload = mag?.reload ?? 1;
     const adsScale = (mag?.ads ?? 1) * (stock?.ads ?? 1);
 
-    s.def.magSize = mag?.rounds ?? base.magSize;
+    s.def.magSize = mag?.rounds ?? s.baseCapacity;
     s.def.reloadTac = base.reloadTac * magReload;
     s.def.reloadEmpty = base.reloadEmpty * magReload;
     s.def.adsTime = base.adsTime * adsScale;
@@ -552,7 +586,7 @@ export class WeaponSystem {
   reload() {
     const s = this.state;
     if (!s || this.reloading || this.switching) return false;
-    if (s.mag >= s.def.magSize || s.reserve <= 0) return false;
+    if (s.mag + (s.def.breakAction && s.chambered ? 1 : 0) >= s.def.magSize || s.reserve <= 0) return false;
     this.viewmodel.stopClip();
     const empty = s.mag === 0 && !s.chambered;
     this.viewmodel.play(empty ? 'reloadEmpty' : 'reloadTac');
@@ -592,6 +626,10 @@ export class WeaponSystem {
     if (this.inspecting) this.viewmodel.stopClip();
 
     const def = s.def;
+    const active = this.viewmodel.active;
+    if (def.breakAction && active) {
+      active.muzzle.y = s.mag > 0 ? active.model.nodes.muzzle[1] : active.model.nodes.lowerMuzzleY;
+    }
     const first = this._sinceShot > 0.35;
     // ---- feed the next round ----
     s.chambered = false;
@@ -615,37 +653,37 @@ export class WeaponSystem {
     const yaw = s.pattern[idx * 2 + 1] * rs;
     this._shotIndex++;
 
-    // ---- aim: camera forward + a spread cone ----
+    // ---- aim: camera forward + one spread sample per projectile ----
     const cam = this.ctx.camera;
     cam.updateMatrixWorld();
     this._camDir.set(0, 0, -1).applyQuaternion(cam.quaternion).normalize();
-    this._dir.copy(this._camDir);
     const spreadRad = this._spread * DEG;
-    if (spreadRad > 1e-5) {
-      const d = this.rng.disc(this._disc ?? (this._disc = { x: 0, y: 0 }));
-      this._right.set(1, 0, 0).applyQuaternion(cam.quaternion);
-      this._up.set(0, 1, 0).applyQuaternion(cam.quaternion);
-      this._dir
-        .addScaledVector(this._right, Math.tan(spreadRad) * d.x)
-        .addScaledVector(this._up, Math.tan(spreadRad) * d.y)
-        .normalize();
-    }
-
-    // ---- projectile ----
     this.viewmodel.muzzleWorld(this._muzzle);
-    const seed = this.rng.u32();
-    this.sim.spawn({
-      origin: this._muzzle,
-      dir: this._dir,
-      speed: def.muzzleVelocity,
-      damage: def.damage,
-      penetration: def.penetration,
-      dragK: def.dragK,
-      dropoff: def.dropoff,
-      maxRange: def.maxRange,
-      weapon: def,
-      tracer: this.stats.fired % def.tracerEvery === 0,
-    });
+    this._right.set(1, 0, 0).applyQuaternion(cam.quaternion);
+    this._up.set(0, 1, 0).applyQuaternion(cam.quaternion);
+    const cone = Math.tan(spreadRad);
+    let seed;
+    for (let pellet = 0; pellet < (def.pellets ?? 1); pellet++) {
+      this._dir.copy(this._camDir);
+      if (spreadRad > 1e-5) {
+        const d = this.rng.disc(this._disc ?? (this._disc = { x: 0, y: 0 }));
+        this._dir.addScaledVector(this._right, cone * d.x)
+          .addScaledVector(this._up, cone * d.y).normalize();
+      }
+      seed ??= this.rng.u32();
+      this.sim.spawn({
+        origin: this._muzzle,
+        dir: this._dir,
+        speed: def.muzzleVelocity,
+        damage: def.damage,
+        penetration: def.penetration,
+        dragK: def.dragK,
+        dropoff: def.dropoff,
+        maxRange: def.maxRange,
+        weapon: def,
+        tracer: pellet === 0 && this.stats.fired % def.tracerEvery === 0,
+      });
+    }
 
     // ---- feedback ----
     this.viewmodel.addRecoil(pitch, yaw, first);
@@ -663,7 +701,7 @@ export class WeaponSystem {
     this._fireSeed = seed;
 
     // Shell leaves the port shortly after the shot, once the bolt is back.
-    this._queueShell(Math.min(0.05, this._fireTimer * 0.45));
+    if (!def.breakAction) this._queueShell(Math.min(0.05, this._fireTimer * 0.45));
     return true;
   }
 
@@ -730,6 +768,15 @@ export class WeaponSystem {
   _completeReload(empty) {
     const s = this.state;
     if (!s) return;
+    if (s.def.breakAction) {
+      const loaded = s.mag + Number(s.chambered);
+      const take = Math.min(s.def.magSize - loaded, s.reserve);
+      s.reserve -= take;
+      s.chambered = loaded + take > 0;
+      s.mag = Math.max(0, loaded + take - 1);
+      this._shotIndex = 0;
+      return;
+    }
     const want = s.def.magSize - s.mag;
     const take = Math.min(want, s.reserve);
     s.reserve -= take;
@@ -790,17 +837,20 @@ export class WeaponSystem {
     let pool = this._magPools.get(w.id);
     if (!pool) {
       pool = [];
+      const magazine = w.parts.magazine;
+      magazine.updateWorldMatrix(true, true);
+      const inverse = new THREE.Matrix4().copy(magazine.matrixWorld).invert();
       for (let i = 0; i < 2; i++) {
         const group = new THREE.Object3D();
         group.name = `dropped-mag-${w.id}-${i}`;
         group.visible = false;
         // Share the viewmodel's geometry and materials; the world copy needs no
         // resources of its own.
-        w.parts.magazine.traverse((o) => {
+        magazine.traverse((o) => {
           if (o.isMesh) {
             const m = new THREE.Mesh(o.geometry, o.material);
-            m.position.copy(o.position);
-            m.quaternion.copy(o.quaternion);
+            m.matrix.multiplyMatrices(inverse, o.matrixWorld);
+            m.matrixAutoUpdate = false;
             m.castShadow = true;
             group.add(m);
           }
@@ -862,6 +912,8 @@ export class WeaponSystem {
       if (input.pressed('Digit1')) this.setWeapon('rifle');
       if (input.pressed('Digit2')) this.setWeapon('smg');
       if (input.pressed('Digit3')) this.setWeapon('pistol');
+      if (input.pressed('Digit4')) this.setWeapon('mcx');
+      if (input.pressed('Digit5')) this.setWeapon('toz');
       if (input.pressed('Tab')) this.nextWeapon();
       /**
        * The wheel does two jobs and the sights decide which.

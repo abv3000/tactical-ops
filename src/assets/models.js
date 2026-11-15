@@ -42,8 +42,8 @@ export function decodeModel(value, binary) {
   return Object.fromEntries(Object.entries(value).map(([key, v]) => [key, decodeModel(v, binary)]));
 }
 
-export async function preloadModels(base = import.meta.env?.BASE_URL ?? '/') {
-  if (isModelBake() || models.size) return;
+export async function preloadModels(base = import.meta.env?.BASE_URL ?? '/', includeWeapons = true) {
+  if (isModelBake()) return;
   const root = `${base.replace(/\/?$/, '/')}baked/models/`;
   const fetchFile = async (name, json = false) => {
     const response = await fetch(root + name);
@@ -55,7 +55,8 @@ export async function preloadModels(base = import.meta.env?.BASE_URL ?? '/') {
     return new Response(response.body.pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
   };
   const manifest = await fetchFile('manifest.json', true);
-  const loaded = await Promise.all(manifest.models.map(async (name) => {
+  const needed = manifest.models.filter(name => !models.has(name) && (includeWeapons || !name.startsWith('weapon-')));
+  const loaded = await Promise.all(needed.map(async (name) => {
     const [meta, binary] = await Promise.all([fetchFile(`${name}.json`, true), fetchFile(`${name}.bin.gz`)]);
     return [name, { meta, binary }];
   }));

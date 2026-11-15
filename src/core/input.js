@@ -22,7 +22,7 @@ export const ACTIONS = {
   melee: ['KeyV'],
   leanLeft: ['KeyQ'],
   leanRight: ['KeyE'],
-  swapWeapon: ['Digit1', 'Digit2', 'Tab'],
+  swapWeapon: ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5', 'Tab'],
   grenade: ['KeyG'],
   flashlight: ['KeyT'],
   pause: ['Escape'],

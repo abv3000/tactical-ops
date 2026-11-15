@@ -1,4 +1,6 @@
 import { isTouchDevice } from '../core/touch.js';
+import { createArmory, ARMORY_CSS } from './armory.js';
+import { ARMORY, readLoadout, saveLoadout } from '../weapons/loadout.js';
 /**
  * Front end — the menu that is on screen BEFORE any 3D exists.
  *
@@ -41,6 +43,7 @@ export const MODES = [
 ];
 
 const CSS = `
+${ARMORY_CSS}
 .ow-fe{position:fixed;inset:0;z-index:50;display:flex;flex-direction:column;
   align-items:center;justify-content:center;gap:2.2rem;
   background:radial-gradient(120% 90% at 50% 0%,#243040 0%,#0d1116 60%,#05070a 100%);
@@ -111,6 +114,7 @@ export function showMainMenu(initial = {}) {
   const touch = isTouchDevice();
   let map = MAPS.some((m) => m.id === initial.map) ? initial.map : touch ? 'swat' : MAPS[0].id;
   let mode = MODES.some((m) => m.id === initial.mode) ? initial.mode : MODES[0].id;
+  let loadout = readLoadout();
 
   const list = (items, sel) =>
     items
@@ -131,12 +135,27 @@ export function showMainMenu(initial = {}) {
         <div class="ow-col" id="ow-modes"><h2>Режим игры</h2>${list(MODES, mode)}</div>
       </div>
       ${touch || initial.fixedQuality ? '' : '<label class="ow-quality">Графика <select aria-label="Графика"><option value="performance">Быстрый запуск</option><option value="low">Детальная</option></select></label>'}
-      <button type="button" class="ow-play">Начать операцию</button>
-      <div class="ow-foot">${touch ? 'Джойстик слева — движение · Свайп справа — обзор<br>Для удобства поверните телефон горизонтально.' : 'WASD — движение · Мышь — прицел · Shift — бег · R — перезарядка · Esc — пауза'}</div>
+      <div class="ow-launch">
+        <button type="button" class="ow-gear">Арсенал</button>
+        <button type="button" class="ow-play">Начать операцию</button>
+      </div>
+      <div class="ow-foot">${touch ? 'Джойстик слева — движение · Свайп справа — обзор<br>Для удобства поверните телефон горизонтально.' : 'WASD — движение · Мышь — прицел · R — перезарядка · 1–5 — оружие · Esc — пауза'}</div>
       <button type="button" class="ow-fullscreen">На весь экран ↗</button>
     </div>
   `);
   document.body.appendChild(root);
+  const gear = root.querySelector('.ow-gear');
+  const summary = () => {
+    gear.textContent = 'Арсенал · ' + ARMORY.find(w => w.id === loadout.weapon).label;
+  };
+  summary();
+  const dialog = el('<dialog class="ow-armory-dialog" aria-labelledby="ow-armory-title"><h2 id="ow-armory-title">Арсенал</h2></dialog>');
+  const armory = createArmory(loadout, value => { loadout = saveLoadout(value); summary(); });
+  const done = el('<button type="button" class="ow-armory-done">Готово</button>');
+  dialog.append(armory.root, done);
+  document.body.appendChild(dialog);
+  gear.addEventListener('click', () => dialog.showModal());
+  done.addEventListener('click', () => dialog.close());
   const quality = root.querySelector('.ow-quality select');
   if (quality) quality.value = initial.quality === 'low' ? 'low' : 'performance';
   const full = root.querySelector(".ow-fullscreen");
@@ -159,11 +178,12 @@ export function showMainMenu(initial = {}) {
   return new Promise((resolve) => {
     const go = () => {
       removeEventListener("keydown", onKey);
+      dialog.remove();
       root.remove();
-      resolve({ map, mode, quality: quality?.value });
+      resolve({ map, mode, quality: quality?.value, loadout });
     };
     root.querySelector('.ow-play').addEventListener('click', go);
-    const onKey = (e) => { if (e.key === 'Enter' && root.isConnected && e.target.tagName !== 'BUTTON') go(); };
+    const onKey = (e) => { if (e.key === 'Enter' && !dialog.open && root.isConnected && !['BUTTON', 'SELECT'].includes(e.target.tagName)) go(); };
     // Enter plays with whatever is selected.
     addEventListener('keydown', onKey);
   });

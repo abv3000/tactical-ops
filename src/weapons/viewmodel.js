@@ -345,6 +345,21 @@ export class Viewmodel {
     const bake = this.mats.lib?.bakeMasks?.bind(this.mats.lib) ?? null;
 
     const build = (asm, parent, wearScale = 1) => {
+      if (asm.scene) {
+        const object = asm.scene.clone(true);
+        object.position.fromArray(asm.offset);
+        object.scale.setScalar(asm.scale);
+        object.traverse(mesh => {
+          if (!mesh.isMesh) return;
+          mesh.geometry = mesh.geometry.clone();
+          mesh.frustumCulled = false;
+          mesh.receiveShadow = true;
+          meshes.push(mesh);
+          tris += triCount(mesh.geometry);
+        });
+        parent.add(object);
+        return;
+      }
       const map = asm.build();
       for (const [matKey, geo] of map) {
         // Curvature masks: convex chamfers wear to bright metal, creases fill
@@ -499,6 +514,7 @@ export class Viewmodel {
     if (parts.slide && n.slideRest) applyNode(parts.slide, n.slideRest);
     if (parts.trigger && n.triggerPivot) applyNode(parts.trigger, n.triggerPivot);
     if (parts.selector && n.selectorPivot) applyNode(parts.selector, n.selectorPivot);
+    if (parts['break-action']) parts['break-action'].position.fromArray(n.hinge);
 
     const entry = {
       id: model.id,
@@ -539,13 +555,14 @@ export class Viewmodel {
       stockId: null,
       skinId: 'black',
     };
-    this._fitSupportHand(entry);
+    if (!model.imported) this._fitSupportHand(entry);
     this.weapons.set(model.id, entry);
     // Default to the sight the ADS framing was measured against.
     if (optics.reddot) this.setOptic(entry.id, 'reddot');
     // ...and the device the muzzle node was authored around.
     if (muzzles.trilug) this.setMuzzle(entry.id, 'trilug');
     else if (muzzles.brake) this.setMuzzle(entry.id, 'brake');
+    else if (muzzles.bare) this.setMuzzle(entry.id, 'bare');
     // ...and the magazine every pose and animation was authored against.
     if (mags.std) this.setMag(entry.id, 'std');
     // ...and the length of pull the recoil numbers were authored against.
@@ -595,6 +612,7 @@ export class Viewmodel {
       if (m.group) m.group.visible = name === muzzleId;
     }
     w.muzzleId = muzzleId;
+    w.def.suppressed = muzzleId === 'can';
     w.muzzle.z = spec.crownZ;
     return true;
   }
@@ -644,6 +662,7 @@ export class Viewmodel {
    * @returns {boolean} false if there is no such skin
    */
   setSkin(weaponId, skinId) {
+    if (this.weapons.get(weaponId)?.model.imported) return false;
     const w = this.weapons.get(weaponId);
     const skin = SKINS[skinId];
     if (!w || !skin) return false;
@@ -1237,6 +1256,11 @@ export class Viewmodel {
 
   _updateParts(w, dt, s, res) {
     const p = w.parts;
+    if (p['break-action']) {
+      const reload = this.clipName === 'reloadTac' || this.clipName === 'reloadEmpty';
+      const t = reload && this.clip ? clamp01(this.clipT / this.clip.duration) : 0;
+      p['break-action'].rotation.x = -.68 * Math.sin(Math.PI * t);
+    }
 
     // Bolt / slide cycle: a fast rearward stroke and a slightly slower return.
     if (this.boltCycle > 0) {

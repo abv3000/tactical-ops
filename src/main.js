@@ -19,8 +19,10 @@ import { showMainMenu, showLoading, MAPS } from './ui/mainmenu.js';
 import { portal } from './core/portal.js';
 import { BAKING, preloadBakedTextures } from './assets/baked-textures.js';
 import { preloadModels } from './assets/models.js';
+import { preloadArmory } from './assets/armory.js';
 import { preloadWorld } from './assets/worlds.js';
 import { loadBakedNavigation } from './assets/navigation.js';
+import { readLoadout } from './weapons/loadout.js';
 import { preloadAudioAssets } from './audio/assets.js';
 import { MobileRenderSystem, MobileSkySystem, preloadReflections } from './render/mobile.js';
 
@@ -95,6 +97,8 @@ async function runMatch(choice) {
     quality: params.get('q') ?? choice.quality ?? (capture ? 'low' : 'performance'),
     map: choice.map,
     mode: choice.mode,
+    loadout: capture ? null : choice.loadout ?? readLoadout(),
+    useArmory: !capture && params.get('armory') !== '0',
     // ?skin= applies a weapon finish at boot — the only way to review one under
     // the real sun, since the weapons preview studio backlights every view.
     skin: params.get('skin') ?? null,
@@ -147,10 +151,11 @@ async function runMatch(choice) {
     const assetStart = performance.now();
     const [, , world, navigation] = await Promise.all([
       preloadBakedTextures(config.quality, undefined, capture || params.has('rview') ? undefined : config.map),
-      preloadModels(),
+      preloadModels(undefined, !config.useArmory),
       BAKING ? undefined : preloadWorld(config.map),
       loadBakedNavigation(config.map),
       config.quality === 'performance' ? preloadReflections() : undefined,
+      config.useArmory ? preloadArmory() : undefined,
     ]);
     engine.ctx.bakedWorld = world;
     engine.ctx.bakedNavigation = navigation;
