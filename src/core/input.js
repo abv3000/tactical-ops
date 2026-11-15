@@ -6,6 +6,8 @@
  * the transition happened — read them in update(), not fixedUpdate().
  */
 
+import { TouchControls, isTouchDevice } from './touch.js';
+
 export const ACTIONS = {
   forward: ['KeyW', 'ArrowUp'],
   back: ['KeyS', 'ArrowDown'],
@@ -83,9 +85,12 @@ export class Input {
     addEventListener('blur', this._bound.blur);
     document.addEventListener('pointerlockchange', this._bound.lockchange);
     this.canvas.addEventListener('contextmenu', this._bound.contextmenu);
+    if (isTouchDevice()) this.touchControls = new TouchControls(this);
   }
 
   detach() {
+    this.touchControls?.dispose();
+    this.touchControls = null;
     removeEventListener('keydown', this._bound.keydown);
     removeEventListener('keyup', this._bound.keyup);
     removeEventListener('mousedown', this._bound.mousedown);
@@ -98,6 +103,7 @@ export class Input {
   }
 
   requestPointerLock() {
+    if (this.touchControls || isTouchDevice()) return;
     if (this.lockSuppressed) return;
     // Chrome returns a promise that rejects if the document is not eligible
     // (headless capture, an iframe, a lock request too soon after an exit).
@@ -161,6 +167,8 @@ export class Input {
 
   /** Losing focus must release every held key, or the player runs forever. */
   _onBlur() {
+    this.touchControls?.reset();
+    this._pendingDown.clear();
     for (const code of this.down) this._pendingUp.add(code);
     this._rawLook.x = 0;
     this._rawLook.y = 0;
@@ -258,6 +266,8 @@ export class Input {
     let y = (this.action('forward') ? 1 : 0) - (this.action('back') ? 1 : 0);
     x += this.stick.moveX;
     y -= this.stick.moveY;
+    x += this.touchControls?.move.x ?? 0;
+    y += this.touchControls?.move.y ?? 0;
     const len = Math.hypot(x, y);
     if (len > 1) {
       x /= len;

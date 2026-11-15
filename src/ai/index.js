@@ -1,3 +1,4 @@
+import { loadBakedNavigation, restoreBakedNavigation } from '../assets/navigation.js';
 /**
  * AI — enemy characters, navigation, perception, cover selection and combat
  * behaviour.
@@ -150,6 +151,7 @@ export class AiSystem {
     // which is what decides how every soldier is stitched together — is
     // unchanged. `update()` keeps the same code as a fallback for the case where
     // the collision world is not registered yet.
+    this._navigation = await loadBakedNavigation(ctx.config.map);
     this._bootNav(ctx);
     await this.prewarmMaterials();
   }
@@ -429,9 +431,8 @@ export class AiSystem {
     bounds.expandByScalar(2);
     const t0 = performance.now();
     this.grid = new NavGrid(phys, { bounds, cell: 0.8, radius: 0.36, height: 1.78 });
-    this.grid.build();
     this.cover = new CoverMap(this.grid, phys);
-    this.cover.build({ step: 1, reach: 1.3 });
+    restoreBakedNavigation(this._navigation, this.grid, this.cover, this.ctx.config.map);
     this.stats.navMs = performance.now() - t0;
     this.stats.coverPts = this.cover.points.length;
     this.stats.walkable = this.grid.walkableCount;

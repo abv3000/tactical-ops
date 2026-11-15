@@ -1,3 +1,4 @@
+import { AUDIO_BAKE, audioAsset } from './assets.js';
 /**
  * AUDIO / MIXER
  *
@@ -133,9 +134,8 @@ export class Mixer {
   }
 
   /**
-   * Render the impulse responses. Split out from the constructor because it is
-   * the single most expensive thing this subsystem does (~15 ms for all five)
-   * and we only want to pay it once audio is actually going to be heard.
+   * Attach preloaded impulse responses. Offline baking is restricted to the
+   * asset-build page; the published game reads PCM from the static audio bank.
    */
   buildReverbs() {
     if (this._irReady) return;
@@ -144,7 +144,8 @@ export class Mixer {
       const conv = actx.createConvolver();
       conv.normalize = false;
       try {
-        conv.buffer = generateIR(actx, this.rng.fork(), IR_SPECS[name]);
+        conv.buffer = AUDIO_BAKE ? generateIR(actx, this.rng.fork(), IR_SPECS[name]) : audioAsset('ir:' + name, actx);
+        if (!conv.buffer) throw new Error('Missing baked IR: ' + name);
       } catch (err) {
         console.warn('[audio] IR generation failed for', name, err);
         continue;

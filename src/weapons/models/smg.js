@@ -1,3 +1,4 @@
+import { isModelBake, getBakedModel } from '../../assets/models.js';
 import { buildMuzzleSet } from '../muzzles.js';
 import { buildMagSet } from '../mags.js';
 import { Assembly, box, blob, extrude, roundRect, latheZ, rodZ, tubeZ, dome, mergeAll } from '../geometry.js';
@@ -33,6 +34,7 @@ import {
  * receiver and a 190 mm magazine, and the silhouette has to read that way.
  */
 export function buildSmg() {
+  if (!isModelBake()) return getBakedModel('weapon-smg');
   const bore = 0.068;
   const rRec = 0.0158;
   const railTop = bore + 0.0245;

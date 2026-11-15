@@ -1,15 +1,16 @@
 import * as THREE from 'three';
+import { BAKING, bakedAsset, registerBakedAsset } from '../assets/baked-textures.js';
 import { TextureForge } from './generator.js';
 import { LIBRARY, resolveName } from './library.js';
 import { extendMaterial, DEFAULT_PARAMS } from './shader.js';
 import { bakeMasks, setMask } from './masks.js';
 
 /**
- * Procedural PBR texture generation and the shared material library.
+ * Prebuilt PBR textures and the shared material library.
  *
- * There are no art assets in this project: every texel is rendered on the GPU
- * at boot from the noise stack in glsl/, packed into three 8-bit textures per
- * surface (albedo+height / ORM / tangent normal) and handed to a
+ * The offline baker renders the noise stack in glsl/ into three packed maps
+ * per surface (albedo+height / ORM / tangent normal). Normal game sessions
+ * load these files from public/baked and hand them to a
  * MeshStandardMaterial extended with projection, parallax, detail, macro
  * variation and weathering (see shader.js).
  *
@@ -54,7 +55,7 @@ export class MaterialSystem {
     this._anisotropy = q?.anisotropy ?? 8;
     // Texture budget scales with the quality preset; 1K is the reference.
     this._quality =
-      ctx?.config?.quality === 'low' ? 0.5 : ctx?.config?.quality === 'medium' ? 0.75 : 1;
+      ['low', 'performance'].includes(ctx?.config?.quality) ? 0.5 : ctx?.config?.quality === 'medium' ? 0.75 : 1;
     /**
      * Drop the per-pixel marches on the web profile.
      *
@@ -71,7 +72,7 @@ export class MaterialSystem {
      * The surfaces keep their albedo, normal, ORM, detail and macro layers —
      * what is lost is the illusion of depth at grazing angles.
      */
-    this._simple = ctx?.config?.quality === 'low';
+    this._simple = ['low', 'performance'].includes(ctx?.config?.quality);
     this._tryBuild();
     await this._warmPrograms();
   }
@@ -85,7 +86,7 @@ export class MaterialSystem {
    * 2.6 s, brick 1.6 s). See `TextureForge.warm`.
    */
   async _warmPrograms() {
-    if (!this._built) return;
+    if (!this._built || !BAKING) return;
     const t0 = performance.now();
     const defs = Object.entries(LIBRARY).map(([key, def]) => ({ key, glsl: def.glsl }));
     const n = await this._forge.warm(defs);
@@ -109,6 +110,11 @@ export class MaterialSystem {
       }
       return false;
     }
+    if (!BAKING) {
+      this._shared = bakedAsset(`shared|${this._size(1024)}`);
+      this._built = true;
+      return true;
+    }
     const t0 = performance.now();
     this._forge = new TextureForge(renderer, { anisotropy: this._anisotropy });
     // 1K, not 512: the micro tooth is 1.6-4 mm over a 0.25 m tile, which needs
@@ -120,6 +126,7 @@ export class MaterialSystem {
       detailAlbedo: detail.albedo,
       macro: macro.albedo,
     };
+    registerBakedAsset(`shared|${this._size(1024)}`, this._shared, renderer);
     this._built = true;
     const ms = performance.now() - t0;
     if (ms > 30) console.info(`[materials] shared maps ${ms.toFixed(0)}ms`);
@@ -151,7 +158,7 @@ export class MaterialSystem {
   _bakeKey(name, bake) {
     return `${name}|${bake.size}|${bake.seed}|${bake.tintA ?? ''}|${bake.tintB ?? ''}|${(
       bake.param ?? []
-    ).join('_')}`;
+    ).join('_')}|${bake.relief}|${bake.worldSize}`;
   }
 
   /** Build (or fetch) the three packed textures for a surface. */
@@ -166,6 +173,12 @@ export class MaterialSystem {
     let set = this._sets.get(cacheKey);
     if (set) return set;
 
+    if (!BAKING) {
+      set = bakedAsset(`material|${cacheKey}`);
+      for (const tex of [set.albedo, set.normal, set.orm]) if (tex) tex.anisotropy = this._anisotropy;
+      this._sets.set(cacheKey, set);
+      return set;
+    }
     const t0 = performance.now();
     this._idle = 0;
     this._scratchFreed = false;
@@ -181,6 +194,7 @@ export class MaterialSystem {
       param: bake.param ? new THREE.Vector4().fromArray(bake.param) : undefined,
     });
     set.name = key;
+    registerBakedAsset(`material|${cacheKey}`, set, this._renderer());
     this._sets.set(cacheKey, set);
     const ms = performance.now() - t0;
     if (ms > 40) console.info(`[materials] bake ${key} ${bake.size}px ${ms.toFixed(0)}ms`);

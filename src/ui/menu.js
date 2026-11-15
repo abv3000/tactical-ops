@@ -471,6 +471,7 @@ export class PauseMenu {
   show() {
     if (this.open) return;
     this.open = true;
+    this.ctx.input?.touchControls?.setPaused(true);
     this.setPage('root');
     this.syncFromConfig();
     setStyle(this.root, 'display', '');
@@ -490,6 +491,7 @@ export class PauseMenu {
   close({ relock = true } = {}) {
     if (!this.open) return;
     this.open = false;
+    this.ctx.input?.touchControls?.setPaused(false);
     this.setPage('root');
     const t = this.ctx.time;
     if (t) t.scale = this._prevScale ?? 1;

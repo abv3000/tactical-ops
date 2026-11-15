@@ -1,3 +1,4 @@
+import { isModelBake, getBakedModel } from '../../assets/models.js';
 import { Assembly, box, blob, extrude, roundRect, latheZ, rodZ, tubeZ, dome, ring, mergeAll } from '../geometry.js';
 import {
   addRail,
@@ -19,6 +20,7 @@ import {
  * 18-degree grip rake, 22 mm of slide travel.
  */
 export function buildPistol() {
+  if (!isModelBake()) return getBakedModel('weapon-pistol');
   const bore = 0.036;
   const slideH = 0.0248;
   const slideW = 0.0262;

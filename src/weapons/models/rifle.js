@@ -1,3 +1,4 @@
+import { isModelBake, getBakedModel } from '../../assets/models.js';
 import { Assembly, box, blob, dome, extrude, roundRect, latheZ, rodZ, mergeAll } from '../geometry.js';
 import { buildOpticSet } from '../optics.js';
 import { buildMuzzleSet } from '../muzzles.js';
@@ -45,6 +46,7 @@ import {
  *   butt pad         z = +0.245
  */
 export function buildRifle() {
+  if (!isModelBake()) return getBakedModel('weapon-rifle');
   const bore = 0.075;
   const rUpper = 0.0192;
   const railTop = bore + 0.0286;

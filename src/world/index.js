@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { loadBakedWorld } from '../assets/worlds.js';
 import { Assembler } from './builder.js';
 import { BUILDINGS, STREET, SET_PIECES, GATE } from './layout.js';
 import { buildGround } from './ground.js';
@@ -116,6 +117,10 @@ export class WorldSystem {
 
   async init(ctx) {
     this.ctx = ctx;
+    if (!globalThis.__BAKE_WORLD__ && !(typeof location !== 'undefined' && new URLSearchParams(location.search).get('bake') === '1')) {
+      await loadBakedWorld(this, ctx);
+      return;
+    }
     this.rng = ctx.rng.fork();
     const rng = this.rng;
     const materials = ctx.get('materials');
@@ -313,6 +318,7 @@ export class WorldSystem {
    * lights are black, and a black light is a no-op however many are lit.
    */
   _stabiliseLightCount(ctx) {
+    if (ctx.peek('render')?.mobile) return;
     const list = this._pointLights;
     if (!list) return;
     const render = this._render ?? (this._render = ctx.peek('render'));

@@ -1,3 +1,4 @@
+import { isModelBake, getBakedModel } from '../assets/models.js';
 /**
  * AI — soldier assembly. Turns the part library into a finished, skinned,
  * material-grouped character. One geometry per visual variant, shared by every
@@ -177,6 +178,13 @@ const bp = (name) => {
  * @returns { geometry, materials: THREE.Material[], weapon, stats }
  */
 export function buildSoldier(name, { rng, materials }) {
+  if (!isModelBake()) {
+    const key = VARIANTS[name] ? name : 'vanguard';
+    const asset = getBakedModel(`soldier-${key}`);
+    asset.materials = resolveMaterials(key, asset.materialNames, materials);
+    asset.variant = VARIANTS[key];
+    return asset;
+  }
   const V = VARIANTS[name] ?? VARIANTS.vanguard;
   const nz = new Noise(rng.fork());
   const B = new CharacterBuilder(RIG, { noise: nz, materials: MATERIALS });
@@ -733,6 +741,7 @@ export function buildSoldier(name, { rng, materials }) {
 
   return {
     geometry: built.geometry,
+    materialNames: built.materialNames,
     materials: mats,
     parts: built.parts,
     weapon: W,

@@ -17,6 +17,11 @@ import { installShotApi } from './dev/shots.js';
 import { prewarm } from './core/prewarm.js';
 import { showMainMenu, showLoading, MAPS } from './ui/mainmenu.js';
 import { portal } from './core/portal.js';
+import { preloadBakedTextures } from './assets/baked-textures.js';
+import { preloadModels } from './assets/models.js';
+import { preloadAudioAssets } from './audio/assets.js';
+import { isTouchDevice } from './core/touch.js';
+import { MobileRenderSystem, MobileSkySystem } from './render/mobile.js';
 
 const params = new URLSearchParams(location.search);
 const capture = params.get('capture') === '1';
@@ -86,7 +91,7 @@ async function runMatch(choice) {
   const config = createConfig({
     // Keep the launch path friendly to browser portals. Use ?q=ultra when
     // comparing the full desktop-quality renderer.
-    quality: params.get('q') ?? 'low',
+    quality: params.get('q') ?? (isTouchDevice() ? 'performance' : 'low'),
     map: choice.map,
     mode: choice.mode,
     // ?skin= applies a weapon finish at boot — the only way to review one under
@@ -125,9 +130,9 @@ async function runMatch(choice) {
 
   // Registration order is irrelevant — Registry topo-sorts on static deps.
   engine
-    .add(RenderSystem)
+    .add(config.quality === 'performance' ? MobileRenderSystem : RenderSystem)
     .add(MaterialSystem)
-    .add(SkySystem)
+    .add(config.quality === 'performance' ? MobileSkySystem : SkySystem)
     .add(WorldSystem)
     .add(PhysicsSystem)
     .add(PlayerSystem)
@@ -138,6 +143,10 @@ async function runMatch(choice) {
     .add(AudioSystem);
 
   try {
+    const assetStart = performance.now();
+    await Promise.all([preloadBakedTextures(config.quality), preloadModels(), preloadAudioAssets()]);
+    window.__ASSET_LOAD_MS__ = performance.now() - assetStart;
+    console.info(`[boot] assets loaded ${window.__ASSET_LOAD_MS__.toFixed(0)}ms`);
     await engine.init();
   } catch (err) {
     console.error('[boot] init failed', err);
@@ -185,8 +194,8 @@ BOOT FAILURE\n\n${err.stack ?? err.message}</pre>`
   window.__PREWARM__ = progress;
 
   const warmup = wantPrewarm
-    ? await prewarm(engine, {
-      transients: capture ? false : (params.get('warm') ?? 'play'),
+    ? config.quality === 'performance' ? await engine.ctx.get('render').warm() : await prewarm(engine, {
+      transients: capture || config.quality === 'performance' ? false : (params.get('warm') ?? 'play'),
       paced: !capture,
       budgetMs: 4,
       /**

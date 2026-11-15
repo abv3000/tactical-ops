@@ -1,16 +1,24 @@
 {
-  "name": "claude-of-duty",
+  "name": "tactical-ops",
   "version": "1.0.0",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node tools/check-assets.mjs && vite build",
     "preview": "vite preview --port 4173",
     "shot": "node tools/capture.mjs",
     "build:yandex": "node tools/package-portal.mjs yandex",
-    "build:crazygames": "node tools/package-portal.mjs crazygames"
+    "build:crazygames": "node tools/package-portal.mjs crazygames",
+    "bake:worlds": "node tools/bake-worlds.mjs",
+    "bake:models": "node tools/bake-models.mjs",
+    "verify:models": "node tools/verify-models.mjs",
+    "bake:textures": "node tools/bake-textures.mjs",
+    "bake:audio": "node tools/bake-audio.mjs",
+    "start": "node tools/local-play.mjs",
+    "bake:environment": "node tools/bake-environment.mjs",
+    "bake:nav": "node tools/bake-navigation.mjs"
   },
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "type": "module",
   "dependencies": {
     "three": "^0.180.0"

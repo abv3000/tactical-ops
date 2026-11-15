@@ -1,7 +1,7 @@
 /**
  * AI — procedural material set for the enemy characters.
  *
- * Tiling PBR sets, all generated on the CPU at boot from tileable value noise:
+ * Tiling PBR sets, generated offline and loaded as static files during play:
  * camouflage ripstop cloth (one bake per uniform pattern), cordura nylon
  * webbing, laminated plate-carrier shell, skin, glass-filled polymer,
  * parkerised steel and boot rubber. Each set is albedo (sRGB) + tangent normal
@@ -22,6 +22,7 @@
  */
 
 import * as THREE from 'three';
+import { BAKING, bakedAsset, registerBakedAsset } from '../assets/baked-textures.js';
 
 /* ------------------------------------------------------------------ */
 /* Tileable value noise                                                */
@@ -533,6 +534,18 @@ export class SoldierMaterials {
   constructor(rng, opts = {}) {
     const size = opts.size ?? 512;
     const aniso = opts.anisotropy ?? 8;
+    if (!BAKING) {
+      const saved = bakedAsset(`soldier|${size}`);
+      this.sets = saved.sets;
+      this.details = saved.details;
+      this.camoStats = saved.camoStats;
+      this.materials = new Map();
+      this._disposables = [];
+      this.bakeMs = 0;
+      for (const set of Object.values(this.sets)) for (const tex of Object.values(set)) tex.anisotropy = aniso;
+      for (const tex of Object.values(this.details)) tex.anisotropy = aniso;
+      return;
+    }
     const nz = new TileNoise(rng.fork());
     const t0 = (typeof performance !== 'undefined' ? performance.now() : 0);
 
@@ -804,6 +817,7 @@ export class SoldierMaterials {
       1.15
     );
 
+    registerBakedAsset(`soldier|${size}`, { sets: this.sets, details: this.details, camoStats: this.camoStats });
     this.bakeMs = (typeof performance !== 'undefined' ? performance.now() : 0) - t0;
     for (const k in this.sets) {
       const s = this.sets[k];

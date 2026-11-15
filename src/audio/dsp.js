@@ -1,3 +1,4 @@
+import { AUDIO_BAKE, audioAsset } from './assets.js';
 /**
  * AUDIO / DSP TOOLKIT
  *
@@ -95,6 +96,12 @@ export class NoiseBank {
     this.actx = actx;
     this.buffers = {};
     for (const kind of ['white', 'pink', 'brown', 'crackle']) {
+      if (!AUDIO_BAKE) {
+        const buf = audioAsset('noise:' + kind);
+        if (!buf) throw new Error('Preload audio before creating NoiseBank (' + kind + ')');
+        this.buffers[kind] = buf;
+        continue;
+      }
       const len = Math.max(1, Math.floor(actx.sampleRate * seconds));
       const buf = actx.createBuffer(2, len, actx.sampleRate);
       // Two decorrelated channels so wide beds get real stereo width.

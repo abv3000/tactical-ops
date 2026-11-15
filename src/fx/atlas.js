@@ -1,3 +1,4 @@
+import { BAKING, bakedAsset, registerBakedAsset } from '../assets/baked-textures.js';
 import * as THREE from 'three';
 import { Noise, clamp01, smoothstep, encodeSrgb } from './noise.js';
 
@@ -786,6 +787,7 @@ function makeTexture(data, size, { srgb, mips = true, name }) {
  * @returns {{texture:THREE.DataTexture, cols:number, size:number}}
  */
 export function buildParticleAtlas(rng, size = 1024) {
+  if (!BAKING) return bakedAsset(`fx-ParticleAtlas|${size}`);
   const n = new Noise(rng);
   const tile = size / ATLAS_COLS;
   const data = new Uint8Array(size * size * 4);
@@ -812,7 +814,7 @@ export function buildParticleAtlas(rng, size = 1024) {
       }
     }
   }
-  return { texture: makeTexture(data, size, { srgb: true, name: 'fx-particles' }), cols: ATLAS_COLS, size };
+  return registerBakedAsset(`fx-ParticleAtlas|${size}`, { texture: makeTexture(data, size, { srgb: true, name: 'fx-particles' }), cols: ATLAS_COLS, size });
 }
 
 /**
@@ -820,6 +822,7 @@ export function buildParticleAtlas(rng, size = 1024) {
  * height field, and packed ORM.
  */
 export function buildDecalAtlas(rng, size = 1024) {
+  if (!BAKING) return bakedAsset(`fx-DecalAtlas|${size}`);
   const n = new Noise(rng);
   const tile = size / ATLAS_COLS;
   const albedo = new Uint8Array(size * size * 4);
@@ -888,13 +891,13 @@ export function buildDecalAtlas(rng, size = 1024) {
     }
   }
 
-  return {
+  return registerBakedAsset(`fx-DecalAtlas|${size}`, {
     albedo: makeTexture(albedo, size, { srgb: true, name: 'fx-decal-albedo' }),
     normal: makeTexture(normal, size, { srgb: false, name: 'fx-decal-normal' }),
     orm: makeTexture(orm, size, { srgb: false, name: 'fx-decal-orm' }),
     cols: ATLAS_COLS,
     size,
-  };
+  });
 }
 
 /**
@@ -902,6 +905,7 @@ export function buildDecalAtlas(rng, size = 1024) {
  * roughness break so casings never read as plastic.
  */
 export function buildBrassTextures(rng, size = 256) {
+  if (!BAKING) return bakedAsset(`fx-BrassTextures|${size}`);
   const n = new Noise(rng);
   const normal = new Uint8Array(size * size * 4);
   const orm = new Uint8Array(size * size * 4);
@@ -943,5 +947,5 @@ export function buildBrassTextures(rng, size = 256) {
   const ot = makeTexture(orm, size, { srgb: false, name: 'fx-brass-orm' });
   nt.wrapS = nt.wrapT = THREE.RepeatWrapping;
   ot.wrapS = ot.wrapT = THREE.RepeatWrapping;
-  return { normal: nt, orm: ot };
+  return registerBakedAsset(`fx-BrassTextures|${size}`, { normal: nt, orm: ot });
 }

@@ -1,3 +1,5 @@
+import { AUDIO_BAKE, audioAsset } from './assets.js';
+import { WEAPON_PROFILES } from './weapons.js';
 import { NoiseBank } from './dsp.js';
 import { weaponShot } from './weapons.js';
 import { shellCasing, surfaceImpact } from './foley.js';
@@ -80,6 +82,15 @@ export class VoiceBank {
   /** Idempotent; returns immediately. Nothing ever waits on a bake. */
   request(key, sampleRate) {
     if (this.banks.has(key) || this.pending.has(key)) return this.pending.get(key);
+    if (!AUDIO_BAKE) {
+      const name = typeof key === 'string' ? key : 'shot:' + (Object.keys(WEAPON_PROFILES).find(k => WEAPON_PROFILES[k] === key) ?? 'rifle');
+      const bufs = Array.from({ length: VARIANTS }, (_, i) => audioAsset(name + ':' + i));
+      if (bufs.every(Boolean)) {
+        this.banks.set(key, bufs);
+        this.stats.baked += bufs.length;
+      }
+      return Promise.resolve();
+    }
     const recipe = this.recipes.get(key);
     if (!recipe) return undefined;
     const job = this._bake(recipe, sampleRate)

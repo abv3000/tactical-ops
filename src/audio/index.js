@@ -1,8 +1,9 @@
+import { preloadAudioAssets } from './assets.js';
 /**
  * AUDIO — synthesized weapon/foley audio, spatialisation, reverb, occlusion, mix
  *
- * Everything is generated with the Web Audio API. There is not a single audio
- * file in the project.
+ * Noise, reverb impulses and frequent weapon/impact/casing samples are loaded
+ * from offline-baked audio files. Spatial filtering and mixing remain live.
  *
  * ───────────────────────────────────────────────────────────────────────────
  * PUBLIC API   const audio = ctx.get('audio')
@@ -164,6 +165,9 @@ export class AudioSystem {
       const actx = new AC({ latencyHint: 'interactive' });
       this.actx = actx;
 
+      const resumed = actx.state === 'suspended' ? actx.resume() : Promise.resolve();
+      await preloadAudioAssets();
+      await resumed;
       this.bank = new NoiseBank(actx, this.rng.fork(), 2.4);
       this.mixer = new Mixer(actx, this.rng.fork(), {});
       this.mixer.buildReverbs();
@@ -174,16 +178,12 @@ export class AudioSystem {
 
       this.voiceBank = new VoiceBank(this.rng.fork());
       this.voiceBank.registerDefaults(WEAPON_PROFILES.rifle);
+      for (const profile of Object.values(WEAPON_PROFILES)) this.voiceBank.request(profile, actx.sampleRate);
       for (const k of [WEAPON_PROFILES.rifle, 'shell:hard', 'shell:soft', 'shell:mid',
                        'impact:hard', 'impact:soft', 'impact:mid']) {
         this.voiceBank.request(k, actx.sampleRate);
       }
-      /**
-       * Bake the rifle immediately — it is what the player spawns holding, and
-       * baking on first fire would put the cost exactly where the stutter was.
-       * Not awaited: rendering happens off the main thread and the procedural
-       * path covers the handful of shots before it lands.
-       */
+      // Every high-frequency voice now comes from the preloaded sample bank.
 
       if (actx.state === 'suspended') await actx.resume();
       this.running = true;
@@ -360,8 +360,8 @@ export class AudioSystem {
          * voice rebalances its layers by range, so a buffer rendered at zero
          * metres is only honest at zero metres. Enemy fire stays synthesised.
          *
-         * `request` is idempotent and returns immediately, so the first shots of
-         * a match are procedural while the bake lands and nothing waits on it.
+         * All variants are preloaded before the graph starts. No voice baking
+         * runs on the published game path.
          */
         if (o.firstPerson) {
           const baked = this.voiceBank?.play(actx, profile, rng, when,

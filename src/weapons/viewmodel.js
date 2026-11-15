@@ -1,3 +1,4 @@
+import { getBakedModel } from '../assets/models.js';
 import * as THREE from 'three';
 import { Arm, HAND_POSES } from './hands.js';
 import { buildClips, makeSampleResult } from './clips.js';
@@ -70,7 +71,7 @@ const _axisZ = new THREE.Vector3(0, 0, 1);
  *
  * @param {THREE.BufferGeometry} geo   must already carry a `color` attribute
  */
-function shapeMasks(geo, o) {
+export function shapeMasks(geo, o) {
   const col = geo.getAttribute('color');
   if (!col) return geo;
   const a = col.array;
@@ -180,7 +181,7 @@ export class Viewmodel {
      * attribute with Math.max and would otherwise be overwritten.
      */
     const bakeArms = this.mats.lib?.bakeMasks?.bind(this.mats.lib) ?? null;
-    if (bakeArms) {
+    if (bakeArms && !this.armR.root.userData.bakedMasks) {
       this.armR.bakeSurfaceMasks(bakeArms, shapeMasks, this.rng);
       this.armL.bakeSurfaceMasks(bakeArms, shapeMasks, this.rng);
     }
@@ -227,16 +228,7 @@ export class Viewmodel {
      *            the segmented ring is what makes it read as an EMITTER, and it
      *            is the standard 65 MOA circle-dot every modern sight ships.
      */
-    const core = new THREE.CircleGeometry(1, 32);
-    const halo = new THREE.CircleGeometry(1.6, 32);
-    const rim = new THREE.RingGeometry(1, 1.42, 32, 1);
-    const RING_SEGS = 12;
-    const ringArcs = [];
-    for (let i = 0; i < RING_SEGS; i++) {
-      const a0 = (i / RING_SEGS) * TAU;
-      ringArcs.push(new THREE.RingGeometry(2.98, 3.42, 4, 1, a0, (TAU / RING_SEGS) * 0.56));
-    }
-    const ring = mergeAll(ringArcs);
+    const { core, halo, rim, ring } = getBakedModel('reticle');
     this._reticleGeo = [core, halo, rim, ring];
     this.dotCore = new THREE.Mesh(core, mats.reticle(0xff1206, 0.95));
     this.dotHalo = new THREE.Mesh(halo, mats.reticle(0xff2a0c, 0.34));
@@ -357,7 +349,7 @@ export class Viewmodel {
       for (const [matKey, geo] of map) {
         // Curvature masks: convex chamfers wear to bright metal, creases fill
         // with grime. This is what stops the gun reading as clean plastic.
-        if (bake) {
+        if (bake && !geo.userData.bakedMasks) {
           /**
            * Chamfered hard-surface geometry has no interior vertices on a face,
            * so a per-vertex edge mask interpolates linearly from the chamfer all

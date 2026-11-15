@@ -1,3 +1,4 @@
+import { isModelBake, getBakedModel } from '../assets/models.js';
 import * as THREE from 'three';
 import { box, blob, latheZ, rodZ, dome, extrude, roundRect, ring, mergeAll } from './geometry.js';
 
@@ -592,6 +593,29 @@ export class Arm {
     this.pole = opts.pole
       ? new THREE.Vector3().fromArray(opts.pole).normalize()
       : new THREE.Vector3(side * 0.46, -0.86, 0.22).normalize();
+
+    if (!isModelBake()) {
+      const asset = getBakedModel(side === 1 ? 'arm-right' : 'arm-left');
+      this.root = asset.root;
+      const at = (address) => address.reduce((node, index) => node.children[index], this.root);
+      for (const [key, address] of Object.entries(asset.refs)) this[key] = at(address);
+      const finger = (f) => ({ root: at(f.root), joints: f.joints.map(at) });
+      this.fingers = asset.fingers.map(finger);
+      this.thumb = finger(asset.thumb);
+      this._segRadius = asset.segRadius;
+      this._segLength = asset.segLength;
+      this.root.traverse((node) => {
+        if (!node.isMesh) return;
+        node.material.dispose();
+        node.material = materials[node.userData.materialSlot];
+        node.castShadow = false;
+        node.receiveShadow = true;
+        node.frustumCulled = false;
+      });
+      this.poses = {};
+      this.setPose(opts.pose ?? 'wrap');
+      return;
+    }
 
     // Bones. Geometry extends along -Z from each joint.
     /**
