@@ -798,7 +798,7 @@ export class WeaponSystem {
   _dropMagazine() {
     const phys = this.physics ?? (this.physics = this.ctx.peek('physics'));
     const w = this.viewmodel.active;
-    if (!w) return;
+    if (!w?.parts.magazine) return;
     const proxy = this._magProxy(w);
     if (!proxy) return;
     const mag = w.parts.magazine;
